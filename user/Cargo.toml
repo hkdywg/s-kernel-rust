@@ -1,0 +1,20 @@
+[package]
+name = "kernel"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "kernel"
+path = "src/main.rs"
+
+[dependencies]
+arch = { path = "../arch/aarch64" }
+common = { path = "../common" }
+mem = { path = "../mem" }
+driver = { path = "../driver" }
+fs = { path = "../fs" }
+ipc = { path = "../ipc" }
+shell = { path = "../shell" }
+
+[features]
+default = []

@@ -1,0 +1,13 @@
+[package]
+name = "ipc"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+common = { path = "../common" }
+mem = { path = "../mem" }
+arch = { path = "../arch/aarch64" }
+
+[lib]
+crate-type = ["rlib"]
+path = "src/lib.rs"

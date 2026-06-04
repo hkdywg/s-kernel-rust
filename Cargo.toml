@@ -1,0 +1,20 @@
+[workspace]
+resolver = "2"
+members = [
+    "arch/aarch64",
+    "common",
+    "mem",
+    "driver",
+    "fs",
+    "ipc",
+    "shell",
+    "user",
+]
+
+[workspace.package]
+version = "1.0.0"
+edition = "2021"
+authors = ["hkdywg <hkdywg@163.com>"]
+license = "GPL-2.0"
+
+[workspace.dependencies]

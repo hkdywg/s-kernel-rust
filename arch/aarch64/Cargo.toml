@@ -1,0 +1,10 @@
+[package]
+name = "arch"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["rlib", "staticlib"]
+
+[features]
+default = []

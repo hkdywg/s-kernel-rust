@@ -1,0 +1,34 @@
+# Rust
+target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# Build artifacts
+*.bin
+*.elf
+*.img
+*.iso
+isodir/
+
+# Debugging
+.gdb_history
+.history
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# tags
+tags
