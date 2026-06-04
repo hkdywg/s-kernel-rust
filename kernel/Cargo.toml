@@ -5,7 +5,7 @@ edition.workspace = true
 
 [[bin]]
 name = "kernel"
-path = "src/main.rs"
+path = "src/kernel.rs"
 
 [dependencies]
 arch = { path = "../arch/aarch64" }

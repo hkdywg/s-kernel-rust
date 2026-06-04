@@ -8,7 +8,7 @@ members = [
     "fs",
     "ipc",
     "shell",
-    "user",
+    "kernel",
 ]
 
 [workspace.package]
