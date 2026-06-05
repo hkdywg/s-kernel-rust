@@ -71,9 +71,11 @@ fn panic(_info: &PanicInfo) -> ! {
 
 mod interrupt;
 mod context;
+mod gic;
 
 pub use interrupt::*;
 pub use context::*;
+pub use gic::*;
 
 /// 禁用中断并返回当前中断状态
 ///
@@ -94,7 +96,7 @@ pub use context::*;
 ///
 /// # 执行流程
 ///
-/// ```asm
+/// ```ignore
 /// mrs {0}, daif    # 读取 DAIF 寄存器（保存当前状态）
 /// msr daifset, #3  # 设置位 3（屏蔽 IRQ 和 FIQ）
 /// dsb sy           # 数据同步屏障（确保写入完成）
@@ -164,7 +166,7 @@ pub unsafe fn disable_interrupts() -> u64 {
 ///
 /// # 执行逻辑
 ///
-/// ```asm
+/// ```ignore
 /// dsb sy           # 数据同步屏障
 /// mov x1, #0xC0    # 0xC0 = 位 6 (D) + 位 7 (A) 的掩码
 /// ands {0}, {0}, x1  # 检查 level 的 D 和 A 位
@@ -259,14 +261,7 @@ pub unsafe fn enable_interrupt(level: u64) {
 /// interrupt_init();
 /// ```
 ///
-/// # 注意事项
-///
-/// 当前为空实现，需要后续完善：
-/// - 实现 GIC 驱动
-/// - 配置中断分发
-/// - 设置优先级掩码
-pub fn interrupt_init() {
-    // TODO: 实现中断控制器初始化
-    // TODO: 设置中断向量表 (set_vbar)
-    // TODO: 配置 GIC (Generic Interrupt Controller)
+pub unsafe fn interrupt_init() {
+    set_vbar();
+    gic_init();
 }
