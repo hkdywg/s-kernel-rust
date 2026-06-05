@@ -14,9 +14,9 @@ use core::arch::asm;
 /// **必须使用 C 语言布局**，原因如下：
 ///
 /// 1. **汇编代码访问**：上下文切换的汇编代码按固定偏移访问结构体字段
-///    ```asm
-///    str x0, [x8]   // x8 = ThreadContext 指针，按偏移 0 存储 SP
-///    ldr x0, [x9]   // x9 = ThreadContext 指针，按偏移 0 加载 SP
+///    ```ignore
+///    str x0, [{from}]   // {from} = ThreadContext 指针，按偏移 0 存储 SP
+///    ldr x0, [{to}]     // {to} = ThreadContext 指针，按偏移 0 加载 SP
 ///    ```
 ///
 /// 2. **布局固定性**：Rust 默认可能重排字段，但汇编代码硬编码了偏移量
@@ -79,7 +79,7 @@ pub struct ThreadContext {
 ///
 /// ## 保存阶段（压栈）
 ///
-/// ```asm
+/// ```ignore
 /// stp x29, x30, [sp, #-16]!  // 保存 FP + LR
 /// stp x27, x28, [sp, #-16]!  // 保存 x27-x28
 /// stp x25, x26, [sp, #-16]!  // ...
@@ -94,19 +94,19 @@ pub struct ThreadContext {
 ///
 /// ## 保存栈指针
 ///
-/// ```asm
-/// mov x0, sp          // x0 = 当前栈指针
-/// str x0, [x8]        // 将 SP 存储到 _from->sp（x8 = _from 指针）
+/// ```ignore
+/// mov x0, sp              // x0 = 当前栈指针
+/// str x0, [x{from}]       // 将 SP 存储到 from->sp
 /// ```
 ///
-/// - `[x8]` 表示访问 x8 指向的内存地址
+/// - `[{from}]` 表示访问 from 指针指向的内存地址
 /// - 由于 ThreadContext 只有一个字段 sp，偏移为 0
 ///
 /// ## 加载目标栈指针
 ///
-/// ```asm
-/// ldr x0, [x9]        // 从 _to->sp 加载目标线程的 SP（x9 = _to 指针）
-/// mov sp, x0          // 更新当前栈指针为目标线程的栈
+/// ```ignore
+/// ldr x0, [{to}]          // 从 to->sp 加载目标线程的 SP
+/// mov sp, x0              // 更新当前栈指针为目标线程的栈
 /// ```
 ///
 /// - 此时栈已切换，SP 指向目标线程的栈
@@ -114,7 +114,7 @@ pub struct ThreadContext {
 ///
 /// ## 恢复阶段（出栈）
 ///
-/// ```asm
+/// ```ignore
 /// ldp x19, x20, [sp], #16  // 恢复 x19-x20
 /// ldp x21, x22, [sp], #16  // 恢复 x21-x22
 /// // ... 恢复所有寄存器
@@ -129,7 +129,7 @@ pub struct ThreadContext {
 ///
 /// - `extern "C"`: 使用 C ABI，确保与汇编兼容
 /// - `unsafe`: 操作裸指针和寄存器，编译器无法保证安全
-/// - 寄存器 x8, x9 作为输入参数（in("x8") _from, in("x9") _to）
+/// - 参数通过通用寄存器传入，使用命名占位符语法
 ///
 /// # 栈布局示例
 ///
@@ -198,35 +198,25 @@ pub struct ThreadContext {
 pub unsafe extern "C" fn hw_context_switch(_from: *mut ThreadContext,
                 _to: *const ThreadContext) {
     asm!(
-        // === 保存当前线程寄存器状态 ===
-        "stp x29, x30, [sp, #-16]!",  // 保存 FP(x29) 和 LR(x30)
-        "stp x27, x28, [sp, #-16]!",  // 保存 callee-saved 寄存器
+        "stp x29, x30, [sp, #-16]!",
+        "stp x27, x28, [sp, #-16]!",
         "stp x25, x26, [sp, #-16]!",
         "stp x23, x24, [sp, #-16]!",
         "stp x21, x22, [sp, #-16]!",
-        "stp x19, x20, [sp, #-16]!",  // 共保存 6 对寄存器
-        
-        // === 保存当前栈指针 ===
-        "mov x0, sp",                 // 将当前 SP 复制到 x0
-        "str x0, [x8]",               // 存储 SP 到 _from->sp（x8 = _from）
-        
-        // === 切换栈指针 ===
-        "ldr x0, [x9]",               // 从 _to->sp 加载目标线程的 SP（x9 = _to）
-        "mov sp, x0",                 // 切换栈指针到目标线程
-        
-        // === 恢复目标线程寄存器状态 ===
-        "ldp x19, x20, [sp], #16",    // 恢复 callee-saved 寄存器
-        "ldp x21, x22, [sp], #16",    // 注意：恢复顺序与保存顺序相反
+        "stp x19, x20, [sp, #-16]!",
+        "mov x0, sp",
+        "str x0, [{from_reg}]",
+        "ldr x0, [{to_reg}]",
+        "mov sp, x0",
+        "ldp x19, x20, [sp], #16",
+        "ldp x21, x22, [sp], #16",
         "ldp x23, x24, [sp], #16",
         "ldp x25, x26, [sp], #16",
         "ldp x27, x28, [sp], #16",
-        "ldp x29, x30, [sp], #16",    // 恢复 FP 和 LR
-        
-        // === 输入参数 ===
-        in("x8") _from,               // x8 = 当前线程上下文指针
-        in("x9") _to,                 // x9 = 目标线程上下文指针
-        
-        // === 选项 ===
-        options(nostack)              // 手动管理栈，不需要编译器检查
+        "ldp x29, x30, [sp], #16",
+        from_reg = in(reg) _from,
+        to_reg = in(reg) _to,
+        options(nostack)
     );
 }
+
