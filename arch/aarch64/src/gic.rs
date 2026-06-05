@@ -125,15 +125,24 @@ pub struct Gic {
 
 /// 全局唯一的 GIC 控制器实例
 ///
-/// 使用 `static mut` 是因为：
-/// - 整个系统只有一个 GIC 控制器
-/// - 需要在初始化时修改其状态
-/// - 不能在栈上分配（会被中断上下文访问）
+/// 整个系统只有一个 GIC 控制器，使用 `static mut` 存放于 BSS 段。
 static mut GIC_CTL: Gic = Gic {
     dist_base: 0,
     cpu_base: 0,
     offset: 0,
 };
+
+/// 获取 GIC 实例的可变裸指针
+#[inline(always)]
+unsafe fn gic_mut() -> *mut Gic {
+    core::ptr::addr_of_mut!(GIC_CTL)
+}
+
+/// 获取 GIC 实例的只读裸指针
+#[inline(always)]
+unsafe fn gic_ref() -> *const Gic {
+    core::ptr::addr_of!(GIC_CTL)
+}
 
 // ============================================================================
 // 底层读写辅助函数
@@ -164,11 +173,11 @@ unsafe fn write32(addr: usize, value: u32) {
 
 /// 计算 Distributor 控制寄存器地址
 #[inline(always)]
-unsafe fn gic_dist_ctrl(base: usize) -> usize { base + GIC_DIST_CTRL }
+fn gic_dist_ctrl(base: usize) -> usize { base + GIC_DIST_CTRL }
 
 /// 计算 Distributor Type 寄存器地址
 #[inline(always)]
-unsafe fn gic_dist_type(base: usize) -> usize { base + GIC_DIST_TYPE }
+fn gic_dist_type(base: usize) -> usize { base + GIC_DIST_TYPE }
 
 /// 计算指定中断的中断分组寄存器地址
 ///
@@ -176,7 +185,7 @@ unsafe fn gic_dist_type(base: usize) -> usize { base + GIC_DIST_TYPE }
 /// - 位 = 0: Group1 (IRQ)
 /// - 位 = 1: Group0 (FIQ)
 #[inline(always)]
-unsafe fn gic_dist_igroup(base: usize, n: u32) -> usize {
+fn gic_dist_igroup(base: usize, n: u32) -> usize {
     base + GIC_DIST_IGROUP + ((n / 32) * 4) as usize
 }
 
@@ -184,7 +193,7 @@ unsafe fn gic_dist_igroup(base: usize, n: u32) -> usize {
 ///
 /// 写入 1 的位使能对应的中断。
 #[inline(always)]
-unsafe fn gic_dist_enable_set(base: usize, n: u32) -> usize {
+fn gic_dist_enable_set(base: usize, n: u32) -> usize {
     base + GIC_DIST_ENABLE_SET + ((n / 32) * 4) as usize
 }
 
@@ -192,31 +201,31 @@ unsafe fn gic_dist_enable_set(base: usize, n: u32) -> usize {
 ///
 /// 写入 1 的位禁用对应的中断。
 #[inline(always)]
-unsafe fn gic_dist_enable_clear(base: usize, n: u32) -> usize {
+fn gic_dist_enable_clear(base: usize, n: u32) -> usize {
     base + GIC_DIST_ENABLE_CLEAR + ((n / 32) * 4) as usize
 }
 
 /// 计算指定中断的挂起设置寄存器地址
 #[inline(always)]
-unsafe fn gic_dist_pending_set(base: usize, n: u32) -> usize {
+fn gic_dist_pending_set(base: usize, n: u32) -> usize {
     base + GIC_DIST_PENDING_SET + ((n / 32) * 4) as usize
 }
 
 /// 计算指定中断的挂起清除寄存器地址
 #[inline(always)]
-unsafe fn gic_dist_pending_clear(base: usize, n: u32) -> usize {
+fn gic_dist_pending_clear(base: usize, n: u32) -> usize {
     base + GIC_DIST_PENDING_CLEAR + ((n / 32) * 4) as usize
 }
 
 /// 计算指定中断的活跃设置寄存器地址
 #[inline(always)]
-unsafe fn gic_dist_active_set(base: usize, n: u32) -> usize {
+fn gic_dist_active_set(base: usize, n: u32) -> usize {
     base + GIC_DIST_ACTIVE_SET + ((n / 32) * 4) as usize
 }
 
 /// 计算指定中断的活跃清除寄存器地址
 #[inline(always)]
-unsafe fn gic_dist_active_clear(base: usize, n: u32) -> usize {
+fn gic_dist_active_clear(base: usize, n: u32) -> usize {
     base + GIC_DIST_ACTIVE_CLEAR + ((n / 32) * 4) as usize
 }
 
@@ -225,7 +234,7 @@ unsafe fn gic_dist_active_clear(base: usize, n: u32) -> usize {
 /// 每个中断分配 8 位优先级，每 4 个中断共享一个 32 位寄存器。
 /// 优先级值越小，优先级越高。
 #[inline(always)]
-unsafe fn gic_dist_pri(base: usize, n: u32) -> usize {
+fn gic_dist_pri(base: usize, n: u32) -> usize {
     base + GIC_DIST_PRI + ((n / 4) * 4) as usize
 }
 
@@ -236,7 +245,7 @@ unsafe fn gic_dist_pri(base: usize, n: u32) -> usize {
 /// - 位 1: 路由到 CPU1
 /// - ...
 #[inline(always)]
-unsafe fn gic_dist_target(base: usize, n: u32) -> usize {
+fn gic_dist_target(base: usize, n: u32) -> usize {
     base + GIC_DIST_TARGET + ((n / 4) * 4) as usize
 }
 
@@ -246,13 +255,13 @@ unsafe fn gic_dist_target(base: usize, n: u32) -> usize {
 /// - 0b00: 电平敏感
 /// - 0b01: 边沿触发
 #[inline(always)]
-unsafe fn gic_dist_config(base: usize, n: u32) -> usize {
+fn gic_dist_config(base: usize, n: u32) -> usize {
     base + GIC_DIST_CONFIG + ((n / 16) * 4) as usize
 }
 
 /// 计算软件中断寄存器地址
 #[inline(always)]
-unsafe fn gic_dist_softint(base: usize) -> usize { base + GIC_DIST_SOFTINT }
+fn gic_dist_softint(base: usize) -> usize { base + GIC_DIST_SOFTINT }
 
 // ============================================================================
 // CPU Interface 寄存器地址计算函数
@@ -260,27 +269,27 @@ unsafe fn gic_dist_softint(base: usize) -> usize { base + GIC_DIST_SOFTINT }
 
 /// 计算 CPU 接口控制寄存器地址
 #[inline(always)]
-unsafe fn gic_cpu_ctrl(base: usize) -> usize { base + GIC_CPU_CTRL }
+fn gic_cpu_ctrl(base: usize) -> usize { base + GIC_CPU_CTRL }
 
 /// 计算优先级掩码寄存器地址
 #[inline(always)]
-unsafe fn gic_cpu_primask(base: usize) -> usize { base + GIC_CPU_PRIMASK }
+fn gic_cpu_primask(base: usize) -> usize { base + GIC_CPU_PRIMASK }
 
 /// 计算二进制点寄存器地址
 #[inline(always)]
-unsafe fn gic_cpu_binpoint(base: usize) -> usize { base + GIC_CPU_BINPOINT }
+fn gic_cpu_binpoint(base: usize) -> usize { base + GIC_CPU_BINPOINT }
 
 /// 计算中断应答寄存器地址
 #[inline(always)]
-unsafe fn gic_cpu_intack(base: usize) -> usize { base + GIC_CPU_INTACK }
+fn gic_cpu_intack(base: usize) -> usize { base + GIC_CPU_INTACK }
 
 /// 计算中断结束寄存器地址
 #[inline(always)]
-unsafe fn gic_cpu_eoi(base: usize) -> usize { base + GIC_CPU_EOI }
+fn gic_cpu_eoi(base: usize) -> usize { base + GIC_CPU_EOI }
 
 /// 计算最高优先级挂起中断寄存器地址
 #[inline(always)]
-unsafe fn gic_cpu_highpri(base: usize) -> usize { base + GIC_CPU_HIGHPRI }
+fn gic_cpu_highpri(base: usize) -> usize { base + GIC_CPU_HIGHPRI }
 
 // ============================================================================
 // Gic 方法实现
@@ -450,12 +459,12 @@ impl Gic {
 
 /// 初始化 GIC Distributor（公共接口）
 pub unsafe fn gic_dist_init(dist_base: usize, irq_start: usize) {
-    GIC_CTL.dist_init(dist_base, irq_start);
+    (*gic_mut()).dist_init(dist_base, irq_start);
 }
 
 /// 初始化 GIC CPU Interface（公共接口）
 pub unsafe fn gic_cpu_init(cpu_base: usize) {
-    GIC_CTL.cpu_init(cpu_base);
+    (*gic_mut()).cpu_init(cpu_base);
 }
 
 /// 启用指定中断（公共接口）
@@ -467,26 +476,26 @@ pub unsafe fn gic_cpu_init(cpu_base: usize) {
 /// gic_enable_irq(27);
 /// ```
 pub unsafe fn gic_enable_irq(irq_num: u32) {
-    GIC_CTL.enable_irq(irq_num);
+    (*gic_ref()).enable_irq(irq_num);
 }
 
 /// 禁用指定中断（公共接口）
 pub unsafe fn gic_disable_irq(irq_num: u32) {
-    GIC_CTL.disable_irq(irq_num);
+    (*gic_ref()).disable_irq(irq_num);
 }
 
 /// 获取当前中断 ID（公共接口）
 ///
 /// 在中断处理程序中使用，获取触发中断的 ID。
 pub unsafe fn gic_get_irq() -> i32 {
-    GIC_CTL.get_irq()
+    (*gic_ref()).get_irq()
 }
 
 /// 中断应答（公共接口）
 ///
 /// 中断处理完成后调用，清理中断状态。
 pub unsafe fn gic_ack_irq(vector: i32) {
-    GIC_CTL.ack_irq(vector);
+    (*gic_ref()).ack_irq(vector);
 }
 
 /// GIC 完整初始化（公共接口）
