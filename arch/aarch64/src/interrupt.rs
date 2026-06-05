@@ -171,8 +171,7 @@ pub unsafe extern "C" fn vector_fiq() {
 /// ```
 pub unsafe fn set_vbar() {
     asm!(
-        "ldr x0, ={0}",               // 加载向量表地址到 x0
-        "msr vbar_el1, x0",           // 写入 VBAR_EL1 系统寄存器
+        "msr vbar_el1, {0}",           // 直接将向量表地址写入 VBAR_EL1
         in(reg) INTERRUPT_VECTOR.as_ptr() as u64,
         options(nostack)
     );
