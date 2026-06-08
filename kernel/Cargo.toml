@@ -3,6 +3,10 @@ name = "kernel"
 version.workspace = true
 edition.workspace = true
 
+[lib]
+crate-type = ["rlib", "staticlib"]
+path = "src/lib.rs"
+
 [[bin]]
 name = "kernel"
 path = "src/kernel.rs"
